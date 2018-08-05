@@ -7,14 +7,22 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/dcormier/go-pixelsort/combiner"
+	// Register all the combiners
+	_ "github.com/dcormier/go-pixelsort/combiner/all"
+	"github.com/dcormier/go-pixelsort/combiner/perceivedoption2noalpha"
+	"github.com/dcormier/go-pixelsort/sortablecolor"
 )
 
 // scaleFrac is used to scale a fraction. It can take 2/8 and scale it to 25/100 or 1/4.
 // The return value is the scaled numerator to match the scaled denonimator passed in.
-func scaleFrac(tb testing.TB, num, den, scaleToDen int64) float64 {
+func scaleFrac(tb testing.TB, num, den, scaleToDen int) float64 {
 	return float64(scaleToDen) *
 		(float64(num) * float64(scaleToDen)) /
 		(float64(den) * float64(scaleToDen))
@@ -39,35 +47,35 @@ func testImage(tb testing.TB) image.Image {
 		&color.NRGBA{R: 255, G: 255, B: 255, A: 255},
 	}
 
+	rowColorsCount := len(rowColors)
 	swatchSize := 128
 
-	img := image.NewRGBA(image.Rect(0, 0, swatchSize, (len(rowColors)*swatchSize)-1))
+	img := image.NewNRGBA(image.Rect(0, 0, swatchSize, (rowColorsCount*swatchSize)-1))
 
 	tb.Logf("Max: %+v; Size: %+v", img.Bounds().Max, img.Bounds().Size())
 
 	maxX := img.Bounds().Dx()
 	maxY := img.Bounds().Dy()
 	rows := maxY + 1
-	rowsPerColor := rows / len(rowColors)
+	rowsPerColor := rows / rowColorsCount
 
-	tb.Logf("rows = %d; rowColors = %d; rowsPerColor = %v",
-		rows, len(rowColors), rowsPerColor)
+	tb.Logf("rows = %d; rowColorsCount = %d; rowsPerColor = %v",
+		rows, rowColorsCount, rowsPerColor)
 
-	maxAlpha := float32(math.MaxUint8)
-	maxXTimesMaxAlpha := float32(maxX) * maxAlpha
 	var rowColor *color.NRGBA
 	x := 0
 	y := 0
 	for x = 0; x <= maxX; x++ {
 		// math.MaxUint8 is opaque. 0 is transparent. We want this image to be written out so that
-		// the pixels on the left are opaque and they gradually become fully transparent on the right.
-		columnAlpha :=
-			uint8(maxAlpha - (maxAlpha * (float32(x) * maxAlpha) / maxXTimesMaxAlpha))
-
+		// the pixels on the left are opaque and they gradually become fully transparent on the
+		// right.
+		columnAlpha := math.MaxUint8 - uint8(scaleFrac(tb, x, maxX, math.MaxUint8))
 		// tb.Logf("columnAlpha for column %d: %d", x, columnAlpha)
+
 		for y = 0; y <= maxY; y++ {
-			rowColor = rowColors[y/rowsPerColor]
+			rowColor = rowColors[int(scaleFrac(tb, y, rows, rowColorsCount))]
 			rowColor.A = columnAlpha
+			// rowColor.A = 255
 			img.Set(x, y, *rowColor)
 		}
 	}
@@ -85,10 +93,72 @@ func savePNG(tb testing.TB, target string, img image.Image) {
 	require.NoError(tb, err)
 }
 
+func imageFromFile(tb testing.TB, file string) image.Image {
+	f, err := os.Open(file)
+	require.NoError(tb, err)
+
+	img, _, err := image.Decode(f)
+	require.NoError(tb, err)
+
+	return img
+}
+
+func sortImage(tb testing.TB, srcFile, destFile string, combiner combiner.Combiner) {
+	srcImg := imageFromFile(tb, srcFile)
+
+	buffer, bounds := sortablecolor.BufferFromImage(srcImg, combiner)
+
+	sort.Sort(sort.Reverse(buffer))
+
+	destImg := image.NewNRGBA64(bounds)
+
+	buffer.ToImage(destImg)
+
+	savePNG(tb, destFile, destImg)
+}
+
 func TestImage(t *testing.T) {
+	// t.SkipNow()
 	t.Parallel()
 
 	img := testImage(t)
 
 	savePNG(t, path.Join("testdata", "golden.png"), img)
+
+	// buffer, bounds := sortablecolor.BufferFromImage(img, sortablecolor.DefaultCombiner)
+	buffer, bounds := sortablecolor.BufferFromImage(img, perceivedoption2noalpha.New())
+	sort.Sort(sort.Reverse(buffer))
+	img2 := image.NewNRGBA64(bounds)
+
+	buffer.ToImage(img2)
+
+	savePNG(t, path.Join("testdata", "output.png"), img2)
+}
+
+func TestImageDemo(t *testing.T) {
+	t.Parallel()
+
+	for _, sourceFile := range []string{
+		path.Join("testdata", "2G7kAHr.jpg"),
+		path.Join("testdata", "starbound_by_steelsoldat-d71fm1o.jpg"),
+	} {
+		t.Run(sourceFile, func(t *testing.T) {
+			sourceFile := sourceFile
+
+			t.Parallel()
+
+			ext := filepath.Ext(sourceFile)
+			imgBaseName := sourceFile[:len(sourceFile)-len(ext)]
+
+			for _, cmb := range combiner.Registered() {
+				t.Run(cmb.Name(), func(t *testing.T) {
+					cmb := cmb
+
+					t.Parallel()
+
+					sortImage(t, sourceFile, imgBaseName+"."+cmb.Name()+".png", cmb)
+				})
+			}
+		})
+	}
 }
