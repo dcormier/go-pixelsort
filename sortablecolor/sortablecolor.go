@@ -40,8 +40,8 @@ var _ sort.Interface = SortableBuffer(nil)
 // Implements http://golang.org/pkg/sort/#Interface
 type SortableBuffer []SortableColor
 
-// BufferFromImage reads in image into a SortableBuffer
-func BufferFromImage(img image.Image, combiner combiner.Combiner) (SortableBuffer, image.Rectangle) {
+// SortableBufferFromImage reads in image into a SortableBuffer
+func SortableBufferFromImage(img image.Image, combiner combiner.Combiner) (SortableBuffer, image.Rectangle) {
 	bounds := img.Bounds()
 
 	// Allocate the memory for the buffer we're going to sort

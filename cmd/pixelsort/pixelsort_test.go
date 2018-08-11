@@ -14,8 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dcormier/go-pixelsort/combiner"
-	// Register all the combiners
-	_ "github.com/dcormier/go-pixelsort/combiner/all"
+	"github.com/dcormier/go-pixelsort/combiner/all"
 	"github.com/dcormier/go-pixelsort/combiner/perceivedoption2noalpha"
 	"github.com/dcormier/go-pixelsort/sortablecolor"
 )
@@ -106,7 +105,7 @@ func imageFromFile(tb testing.TB, file string) image.Image {
 func sortImage(tb testing.TB, srcFile, destFile string, combiner combiner.Combiner) {
 	srcImg := imageFromFile(tb, srcFile)
 
-	buffer, bounds := sortablecolor.BufferFromImage(srcImg, combiner)
+	buffer, bounds := sortablecolor.SortableBufferFromImage(srcImg, combiner)
 
 	sort.Sort(sort.Reverse(buffer))
 
@@ -126,7 +125,7 @@ func TestImage(t *testing.T) {
 	savePNG(t, path.Join("testdata", "golden.png"), img)
 
 	// buffer, bounds := sortablecolor.BufferFromImage(img, sortablecolor.DefaultCombiner)
-	buffer, bounds := sortablecolor.BufferFromImage(img, perceivedoption2noalpha.New())
+	buffer, bounds := sortablecolor.SortableBufferFromImage(img, perceivedoption2noalpha.Combiner)
 	sort.Sort(sort.Reverse(buffer))
 	img2 := image.NewNRGBA64(bounds)
 
@@ -150,7 +149,7 @@ func TestImageDemo(t *testing.T) {
 			ext := filepath.Ext(sourceFile)
 			imgBaseName := sourceFile[:len(sourceFile)-len(ext)]
 
-			for _, cmb := range combiner.Registered() {
+			for _, cmb := range all.All() {
 				t.Run(cmb.Name(), func(t *testing.T) {
 					cmb := cmb
 

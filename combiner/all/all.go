@@ -3,10 +3,23 @@ package all
 
 import (
 	// These are blank imports just to get their init functions to run to register them.
-	_ "github.com/dcormier/go-pixelsort/combiner/alphablend"
-	_ "github.com/dcormier/go-pixelsort/combiner/basic"
-	_ "github.com/dcormier/go-pixelsort/combiner/perceivedoption1"
-	_ "github.com/dcormier/go-pixelsort/combiner/perceivedoption2"
-	_ "github.com/dcormier/go-pixelsort/combiner/perceivedoption2noalpha"
-	_ "github.com/dcormier/go-pixelsort/combiner/standardobjective"
+	"github.com/dcormier/go-pixelsort/combiner"
+	"github.com/dcormier/go-pixelsort/combiner/alphablend"
+	"github.com/dcormier/go-pixelsort/combiner/basic"
+	"github.com/dcormier/go-pixelsort/combiner/perceivedoption1"
+	"github.com/dcormier/go-pixelsort/combiner/perceivedoption2"
+	"github.com/dcormier/go-pixelsort/combiner/perceivedoption2noalpha"
+	"github.com/dcormier/go-pixelsort/combiner/standardobjective"
 )
+
+// All retuns all the known combiner.Combiners
+func All() []combiner.Combiner {
+	return []combiner.Combiner{
+		alphablend.Combiner,
+		basic.Combiner,
+		perceivedoption1.Combiner,
+		perceivedoption2.Combiner,
+		perceivedoption2noalpha.Combiner,
+		standardobjective.Combiner,
+	}
+}

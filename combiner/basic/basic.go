@@ -7,9 +7,8 @@ import (
 	"github.com/dcormier/go-pixelsort/combiner"
 )
 
-func init() {
-	combiner.Register(New())
-}
+// Combiner is an instance of this Combiner
+var Combiner = New()
 
 var _ combiner.Combiner = (*basic)(nil)
 

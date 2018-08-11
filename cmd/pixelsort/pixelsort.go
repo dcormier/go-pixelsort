@@ -74,7 +74,7 @@ func main() {
 
 	combiner := perceivedoption2.New()
 
-	buffer, bounds := sortablecolor.BufferFromImage(img, combiner)
+	buffer, bounds := sortablecolor.SortableBufferFromImage(img, combiner)
 
 	fmt.Println("Image metadata:")
 	fmt.Printf("    File:   %s\n", input)
