@@ -154,21 +154,3 @@ func main() {
 
 	writer.Close()
 }
-
-func sortImg(buffer []sortablecolor.SortableColor) {
-	// Bubble sort http://www.sorting-algorithms.com/bubble-sort
-	// http://www.planet-source-code.com/vb/scripts/ShowCode.asp?txtCodeId=2966&lngWId=3
-	// Reversed for more favorable memory access
-
-	var temp sortablecolor.SortableColor
-
-	for i := len(buffer) - 2; i >= 0; i-- {
-		for j := i; j < len(buffer)-1; j++ {
-			if buffer[j].Compare(buffer[j+1]) < 0 {
-				temp = buffer[j]
-				buffer[j] = buffer[j+1]
-				buffer[j+1] = temp
-			}
-		}
-	}
-}
