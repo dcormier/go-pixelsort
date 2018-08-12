@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"image"
 	"image/color"
 	"image/png"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -11,13 +14,15 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dcormier/go-pixelsort/combiner"
 	"github.com/dcormier/go-pixelsort/combiner/all"
-	"github.com/dcormier/go-pixelsort/combiner/perceivedoption2noalpha"
 	"github.com/dcormier/go-pixelsort/sortablecolor"
 )
+
+var update = flag.Bool("update", false, "update .golden files")
 
 // scaleFrac is used to scale a fraction. It can take 2/8 and scale it to 25/100 or 1/4.
 // The return value is the scaled numerator to match the scaled denonimator passed in.
@@ -82,16 +87,6 @@ func testImage(tb testing.TB) image.Image {
 	return img
 }
 
-func savePNG(tb testing.TB, target string, img image.Image) {
-	f, err := os.Create(target)
-	require.NoError(tb, err)
-
-	defer f.Close()
-
-	err = png.Encode(f, img)
-	require.NoError(tb, err)
-}
-
 func imageFromFile(tb testing.TB, file string) image.Image {
 	f, err := os.Open(file)
 	require.NoError(tb, err)
@@ -102,9 +97,7 @@ func imageFromFile(tb testing.TB, file string) image.Image {
 	return img
 }
 
-func sortImage(tb testing.TB, srcFile, destFile string, combiner combiner.Combiner) {
-	srcImg := imageFromFile(tb, srcFile)
-
+func sortImage(tb testing.TB, srcImg image.Image, combiner combiner.Combiner) image.Image {
 	buffer, bounds := sortablecolor.SortableBufferFromImage(srcImg, combiner)
 
 	sort.Sort(sort.Reverse(buffer))
@@ -113,7 +106,68 @@ func sortImage(tb testing.TB, srcFile, destFile string, combiner combiner.Combin
 
 	buffer.ToImage(destImg)
 
-	savePNG(tb, destFile, destImg)
+	return destImg
+}
+
+func savePNG(tb testing.TB, target string, img image.Image) {
+	f, err := os.Create(target)
+	require.NoError(tb, err)
+
+	defer f.Close()
+
+	err = png.Encode(f, img)
+	require.NoError(tb, err)
+}
+
+func compareImages(tb testing.TB, expectedFilename string, expectedImg, actualImg []byte) {
+	if !assert.EqualValues(tb, expectedImg, actualImg) {
+		baseName, _ := splitFilename(expectedFilename)
+
+		if baseBaseName, ext2 := splitFilename(baseName); ext2 == ".golden" {
+			baseName = baseBaseName
+		}
+
+		err := ioutil.WriteFile(baseName+".failure.png", actualImg, 0)
+		require.NoError(tb, err)
+
+		if tb.Failed() {
+			tb.FailNow()
+		}
+	}
+}
+
+func compareImageToFile(tb testing.TB, expectedFilename string, actualImg []byte) {
+	expectedBytes, err := ioutil.ReadFile(expectedFilename)
+	require.NoError(tb, err)
+
+	compareImages(tb, expectedFilename, expectedBytes, actualImg)
+}
+
+func testAllCombiners(t *testing.T, srcImgName string, srcImg image.Image) {
+	imgBaseName, _ := splitFilename(srcImgName)
+
+	for _, cmb := range all.All() {
+		t.Run(cmb.Name(), func(t *testing.T) {
+			cmb := cmb
+
+			t.Parallel()
+
+			destImg := sortImage(t, srcImg, cmb)
+
+			goldenName := imgBaseName + "." + cmb.Name() + ".golden.png"
+
+			if *update {
+				savePNG(t, goldenName, destImg)
+				return
+			}
+
+			destImgBuf := &bytes.Buffer{}
+			err := png.Encode(destImgBuf, destImg)
+			require.NoError(t, err)
+
+			compareImageToFile(t, goldenName, destImgBuf.Bytes())
+		})
+	}
 }
 
 func TestImage(t *testing.T) {
@@ -121,43 +175,36 @@ func TestImage(t *testing.T) {
 	t.Parallel()
 
 	img := testImage(t)
+	imgFilename := path.Join("testdata", "colors.png")
 
-	savePNG(t, path.Join("testdata", "golden.png"), img)
+	if *update {
+		savePNG(t, imgFilename, img)
+	}
 
-	// buffer, bounds := sortablecolor.BufferFromImage(img, sortablecolor.DefaultCombiner)
-	buffer, bounds := sortablecolor.SortableBufferFromImage(img, perceivedoption2noalpha.Combiner)
-	sort.Sort(sort.Reverse(buffer))
-	img2 := image.NewNRGBA64(bounds)
+	testAllCombiners(t, imgFilename, img)
+}
 
-	buffer.ToImage(img2)
+func splitFilename(filename string) (base, ext string) {
+	ext = filepath.Ext(filename)
+	base = filename[:len(filename)-len(ext)]
 
-	savePNG(t, path.Join("testdata", "output.png"), img2)
+	return base, ext
 }
 
 func TestImageDemo(t *testing.T) {
 	t.Parallel()
 
-	for _, sourceFile := range []string{
+	for _, srcFile := range []string{
 		path.Join("testdata", "2G7kAHr.jpg"),
 		path.Join("testdata", "starbound_by_steelsoldat-d71fm1o.jpg"),
 	} {
-		t.Run(sourceFile, func(t *testing.T) {
-			sourceFile := sourceFile
+		t.Run(srcFile, func(t *testing.T) {
+			srcFile := srcFile
 
 			t.Parallel()
 
-			ext := filepath.Ext(sourceFile)
-			imgBaseName := sourceFile[:len(sourceFile)-len(ext)]
-
-			for _, cmb := range all.All() {
-				t.Run(cmb.Name(), func(t *testing.T) {
-					cmb := cmb
-
-					t.Parallel()
-
-					sortImage(t, sourceFile, imgBaseName+"."+cmb.Name()+".png", cmb)
-				})
-			}
+			srcImg := imageFromFile(t, srcFile)
+			testAllCombiners(t, srcFile, srcImg)
 		})
 	}
 }
