@@ -49,9 +49,10 @@ func SortableBufferFromImage(img image.Image, combiner combiner.Combiner) (Sorta
 
 	// Read the image into the buffer
 	for y := 0; y < bounds.Dy(); y++ {
+		bufY := buffer[y*bounds.Dx():]
+
 		for x := 0; x < bounds.Dx(); x++ {
-			// buffer[x*bounds.Dy() : (x+1)*bounds.Dy()][y] = img.At(x, y)
-			buffer[y*bounds.Dx():][x].Set(img.At(x, y), combiner)
+			bufY[x].Set(img.At(x, y), combiner)
 		}
 	}
 
@@ -71,10 +72,11 @@ func (buf SortableBuffer) ToImage(img SettableImage) {
 	var c color.Color
 
 	// Write it back out to the image
-	for x := 0; x < bounds.Dx(); x++ {
-		for y := 0; y < bounds.Dy(); y++ {
-			// c = buf[x*bounds.Dy() : (x+1)*bounds.Dy()][y]
-			c = buf[y*bounds.Dx():][x].Color
+	for y := 0; y < bounds.Dy(); y++ {
+		bufY := buf[y*bounds.Dx():]
+
+		for x := 0; x < bounds.Dx(); x++ {
+			c = bufY[x].Color
 			img.Set(x, y, img.ColorModel().Convert(c))
 		}
 	}
@@ -89,7 +91,5 @@ func (buf SortableBuffer) Less(i, j int) bool {
 }
 
 func (buf SortableBuffer) Swap(i, j int) {
-	temp := buf[j]
-	buf[j] = buf[i]
-	buf[i] = temp
+	buf[i], buf[j] = buf[j], buf[i]
 }

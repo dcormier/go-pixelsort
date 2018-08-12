@@ -171,7 +171,6 @@ func testAllCombiners(t *testing.T, srcImgName string, srcImg image.Image) {
 }
 
 func TestImage(t *testing.T) {
-	// t.SkipNow()
 	t.Parallel()
 
 	img := testImage(t)
