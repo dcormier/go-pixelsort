@@ -95,23 +95,13 @@ func main() {
 	switch imgFmt {
 	case formatJpeg:
 		outFmt = formatJpeg
-		break
-		// fallthrough
-	case formatPng:
-		// No change
-		// break
-		fallthrough
 
-	case "gif":
-		fallthrough
-	case "tiff":
+	case formatPng, "gif", "tiff":
 		outFmt = formatPng
-		break
 
 	default:
 		fmt.Printf("Not sure what to do with image format %q. Defaulting to writing a PNG.", imgFmt)
 		outFmt = formatPng
-		break
 	}
 
 	fmt.Printf("Output format is %v\n", outFmt)
